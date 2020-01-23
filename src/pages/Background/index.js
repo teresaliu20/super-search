@@ -20,19 +20,25 @@ function navigate(url) {
   });
 }
 
+function validURL(str) {
+  var pattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|'+ // domain name
+    '((\\d{1,3}\\.){3}\\d{1,3}))'+ // OR ip (v4) address
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+    '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+  return !!pattern.test(str);
+}
+
 function handleTabOnInputChange(text, suggest) {
   chrome.tabs.query({}, function(tabs) {
-    const searchQuery = text.split('tab').pop().trim().toLowerCase()
+    const searchQuery = text.split('tab ').pop().trim().toLowerCase()
 
     const filteredTabs = tabs.filter(tab => tab.title.toLowerCase().includes(searchQuery))
     const tabSuggestions = filteredTabs.map(tab => {
-      const content = {
-        type: 'tab',
-        tabId: tab.id
-      }
       return {
-        content: JSON.stringify(content),
-        description: encodeXml('👉 TAB ' + tab.title)
+        content: tab.url +  " · switch to tab " + tab.id,
+        description: encodeXml('👉 | ' + tab.title)
       }})
 
     console.log(tabSuggestions)
@@ -41,18 +47,14 @@ function handleTabOnInputChange(text, suggest) {
 }
 
 function handleBookmarkOnInputChange(text, suggest) {
-  const searchQuery = text.split('bookmark').pop()
+  const searchQuery = text.split('bookmark ').pop()
   chrome.bookmarks.search(searchQuery, function(bookmarks) {
     console.log("bookmarks")
     console.log(bookmarks)
     const bookmarkSuggestions = bookmarks.map(bookmark => {
-      const content = {
-        type: 'bookmark',
-        url: bookmark.url
-      }
       return {
-        content: JSON.stringify(content),
-        description: encodeXml('📚 BOOKMARK ' + bookmark.title + ' · ' + bookmark.url)
+        content: bookmark.url,
+        description: encodeXml('📚 | ' + bookmark.title + ' · ' + bookmark.url)
       }})
 
     console.log(bookmarkSuggestions)
@@ -60,32 +62,47 @@ function handleBookmarkOnInputChange(text, suggest) {
   })
 }
 
-function handleTabOnInputEntered(content) {
-  chrome.tabs.update(parseInt(content.tadId), {active: true})
-}
+function handleHistoryInputChange(text, suggest) {
+  const searchQuery = {
+    text: text.split('history ').pop(),
+    maxResults: 6
+  }
+  chrome.history.search(searchQuery, function(historyItems) {
+    console.log("bookmarks")
+    console.log(historyItems)
+    const historySuggestions = historyItems.map(historyItem => {
+      return {
+        content: historyItem.url,
+        description: encodeXml('📺 | ' + historyItem.title + ' · ' + historyItem.url)
+      }})
 
-function handleBookmarkOnInputEntered(content) {
-  navigate(content.url)
+    console.log(historySuggestions)
+    suggest(historySuggestions)
+  })
 }
 
 chrome.omnibox.onInputChanged.addListener(function(text, suggest) {
   if (text.startsWith('tab')) {
     handleTabOnInputChange(text, suggest)
   }
-  if (text.startsWith('bookmark')) {
+  else if (text.startsWith('bookmark')) {
     handleBookmarkOnInputChange(text, suggest)
+  }
+  else if (text.startsWith('history')) {
+    handleHistoryInputChange(text, suggest)
   }
 });
 
 chrome.omnibox.onInputEntered.addListener(function(text) {
   console.log("received enter event")
-  const content = JSON.parse(text)
-  console.log(content)
 
-  if (content.type === 'tab') {
-    handleTabOnInputEntered(content)
+  if (validURL(text)) {
+    navigate(text)
   }
-  if (content.type === 'bookmark') {
-    handleBookmarkOnInputEntered(content)
+  else if (text.startsWith('· switch to tab ')) {
+    const tabId = parseInt(text.split('· switch to tab ').pop())
+    chrome.tabs.update(parseInt(tabId), {active: true})
   }
 });
+
+
