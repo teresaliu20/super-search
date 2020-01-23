@@ -94,14 +94,14 @@ chrome.omnibox.onInputChanged.addListener(function(text, suggest) {
 });
 
 chrome.omnibox.onInputEntered.addListener(function(text) {
-  console.log("received enter event")
-
+  console.log("received enter event", text)
   if (validURL(text)) {
     navigate(text)
   }
-  else if (text.startsWith('· switch to tab ')) {
+  else if (text.includes('· switch to tab ')) {
     const tabId = parseInt(text.split('· switch to tab ').pop())
-    chrome.tabs.update(parseInt(tabId), {active: true})
+    console.log("switching to tab ", tabId)
+    chrome.tabs.update(parseInt(tabId), {highlighted: true})
   }
 });
 
